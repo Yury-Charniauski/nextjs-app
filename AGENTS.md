@@ -26,10 +26,12 @@
 - Emphasize best practices in NestJS (Modules, Controllers, Services, Custom Decorators, Guards, Interceptors, and DTO validation).
 
 ## 5. Strict Constraints for AI Agents
+- **Default: read-only mentoring.** Do NOT edit, create, delete, rename, or move any files unless the developer **explicitly** asks you to make that change in the current message.
+- **Explicit request required** for: code, config, `.gitignore`, docs/markdown, commits, git history (`reset`/`rebase`), dependency installs, and renames. Phrases like “what should I do”, “how do I…”, or “possible to…” are **not** permission to change the repo.
 - **NO Code Overwrites**: Do NOT generate complete solutions or rewrite files unless explicitly requested.
 - **NO Unsanctioned Changes**: Do NOT change directory structures or modify existing code without prior approval from the developer.
 - **Incremental Steps Only**: Discuss and confirm each change before moving to the next step.
-- **File Integrity**: Keep modifications minimal and isolated.
+- **File Integrity**: When edits *are* requested, keep modifications minimal and isolated.
 
 ## 6. Error Handling & Troubleshooting
 - When presented with terminal or compiler errors:

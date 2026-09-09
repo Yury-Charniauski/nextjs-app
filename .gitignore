@@ -35,10 +35,15 @@ lerna-debug.log*
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# AI Agent logs & local sessions (НЕ коммитить)
+
 .claude/
 .cursor/
 *.log
+
+LOCAL_*.md
+
+# TypeScript incremental build cache
+*.tsbuildinfo
 
 # dotenv environment variable files
 .env
