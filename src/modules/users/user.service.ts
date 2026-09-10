@@ -40,4 +40,12 @@ export class UserService {
       where: { email },
     });
   }
+
+  async updateStatus(id: string, status: UserStatus) {
+    return this.prisma.user.update({
+      where: { id },
+      data: { status },
+      select: { id: true, email: true, status: true },
+    });
+  }
 }

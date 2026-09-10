@@ -1,5 +1,11 @@
 import { REDIS_CLIENT } from '@/common/redis/redis.module.js';
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { Redis } from 'ioredis';
 
 interface OtpData {
@@ -20,12 +26,13 @@ export class OtpService {
   }
 
   async createOtp(userId: string): Promise<string> {
-    const rateLimitKey = `ratelimit:otp:${userId}`;
+    const rateLimitKey = `ratelimit:otp:registration${userId}`;
     const isRateLimited = await this.redis.get(rateLimitKey);
 
     if (isRateLimited) {
-      throw new BadRequestException(
-        'Verification code already sent& Please wait 60 seconds.',
+      throw new HttpException(
+        'Verification code already sent. Please wait 60 seconds.',
+        HttpStatus.TOO_MANY_REQUESTS,
       );
     }
 
@@ -69,7 +76,7 @@ export class OtpService {
       }
     }
 
-    await this.redis.del(otpKey)
-    return true
+    await this.redis.del(otpKey);
+    return true;
   }
 }

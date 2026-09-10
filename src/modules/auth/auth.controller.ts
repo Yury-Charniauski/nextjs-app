@@ -1,3 +1,4 @@
+import { ConfirmEmailDto } from "@/modules/auth/dto/confirm-email.dto.js";
 import { RegisterDto } from "@/modules/auth/dto/register.dto.js";
 import { AuthService } from "@/modules/auth/services/auth.service.js";
 import { Body, Controller, Post } from "@nestjs/common";
@@ -10,5 +11,10 @@ export class AuthController {
 	@Post('register')
 	register(@Body() dto: RegisterDto) {
 		return this.authService.register(dto)
+	}
+
+	@Post('confirm-email')
+	confirmEmail(@Body() dto: ConfirmEmailDto) {
+		return this.authService.confirmEmail(dto)
 	}
 }
