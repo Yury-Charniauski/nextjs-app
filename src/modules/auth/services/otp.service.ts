@@ -26,7 +26,7 @@ export class OtpService {
   }
 
   async createOtp(userId: string): Promise<string> {
-    const rateLimitKey = `ratelimit:otp:registration${userId}`;
+    const rateLimitKey = `ratelimit:otp:registration:${userId}`;
     const isRateLimited = await this.redis.get(rateLimitKey);
 
     if (isRateLimited) {
