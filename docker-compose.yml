@@ -21,6 +21,14 @@ services:
     volumes:
       - 'redis_data:/data'
 
+  mailpit:
+    image: axllent/mailpit
+    container_name: nestjs_mailpit
+    restart: unless-stopped
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+
 volumes:
   postgres_data:
   redis_data:

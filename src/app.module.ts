@@ -5,9 +5,10 @@ import { PrismaModule } from "./prisma/prisma.module.js";
 import { UserModule } from "./modules/users/user.module.js";
 import { AuthModule } from "@/modules/auth/auth.module.js";
 import { RedisModule } from "@/common/redis/redis.module.js";
+import { MailerModule } from "@/common/mailer/mailer.module.js";
 
 @Module({
-  imports: [PrismaModule, UserModule, AuthModule, RedisModule],
+  imports: [PrismaModule, UserModule, AuthModule, RedisModule, MailerModule],
   controllers: [AppController],
   providers: [AppService],
 })
