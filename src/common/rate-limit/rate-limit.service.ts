@@ -1,11 +1,5 @@
 import { REDIS_CLIENT } from '@/common/redis/redis.module.js';
-import {
-  HttpException,
-  HttpStatus,
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { Redis } from 'ioredis';
 
 @Injectable()

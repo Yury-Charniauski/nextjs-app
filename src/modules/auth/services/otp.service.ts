@@ -70,9 +70,7 @@ export class OtpService {
       const ttl = await this.redis.ttl(otpKey);
       if (ttl > 0) {
         await this.redis.set(otpKey, JSON.stringify(data), 'EX', ttl);
-        throw new BadRequestException(
-          `Invalid code. Remaining attempts: ${this.MAX_ATTEMPTS - data.attempts}`,
-        );
+        throw new BadRequestException('Invalid or expired verification code.');
       }
     }
 

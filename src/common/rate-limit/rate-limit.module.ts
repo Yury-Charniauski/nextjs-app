@@ -1,4 +1,4 @@
-import { RateLimitService } from "@/common/reate-limit/rate-limit.service.js";
+import { RateLimitService } from "@/common/rate-limit/rate-limit.service.js";
 import { Global, Module } from "@nestjs/common";
 
 @Global()

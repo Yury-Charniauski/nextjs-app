@@ -4,8 +4,8 @@ import { createTransport } from 'nodemailer';
 @Injectable()
 export class MailerService {
   transport = createTransport({
-    host: process.env.SMTR_HOST,
-    port: process.env.SMRT_PORT,
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT),
   });
 
   async sendRegistrationOtp(email: string, code: string) {

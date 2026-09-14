@@ -1,6 +1,6 @@
 import { ConfirmEmailDto } from "@/modules/auth/dto/confirm-email.dto.js";
 import { RegisterDto } from "@/modules/auth/dto/register.dto.js";
-import { ResentOtpDto } from "@/modules/auth/dto/resent-otp.dto.js";
+import { ResendOtpDto } from '@/modules/auth/dto/resend-otp.dto.js';
 import { AuthService } from "@/modules/auth/services/auth.service.js";
 import { Body, Controller, Post } from "@nestjs/common";
 
@@ -20,7 +20,7 @@ export class AuthController {
   }
 
   @Post('resend-otp')
-  resendOtp(@Body() dto: ResentOtpDto) {
+  resendOtp(@Body() dto: ResendOtpDto) {
     return this.authService.resendOtp(dto);
   }
 }
