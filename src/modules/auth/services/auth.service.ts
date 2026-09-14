@@ -1,4 +1,5 @@
 import { MailerService } from '@/common/mailer/mailer.service.js';
+import { RateLimitService } from '@/common/reate-limit/rate-limit.service.js';
 import { UserStatus } from '@/generated/prisma/enums.js';
 import { ConfirmEmailDto } from '@/modules/auth/dto/confirm-email.dto.js';
 import { RegisterDto } from '@/modules/auth/dto/register.dto.js';
@@ -23,6 +24,7 @@ export class AuthService {
     private readonly otpService: OtpService,
     private readonly prisma: PrismaService,
     private readonly mailerService: MailerService,
+    private readonly rateLimitService: RateLimitService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{
@@ -31,6 +33,9 @@ export class AuthService {
     status: UserStatus;
     requireConfirmation: boolean;
   }> {
+    const email = dto.email.toLocaleLowerCase();
+    await this.rateLimitService.consume(`ratelimit:register:${email}`, 60);
+
     const existedEmail = await this.userService.findByEmail(dto.email);
     if (existedEmail) {
       throw new ConflictException('Email already registered.');
@@ -92,7 +97,7 @@ export class AuthService {
     }
 
     const code = await this.otpService.createOtp(dto.userId);
-    this.mailerService.sendRegistrationOtp(existUser.email, code)
+    this.mailerService.sendRegistrationOtp(existUser.email, code);
 
     return { massage: 'Verification code send.' };
   }

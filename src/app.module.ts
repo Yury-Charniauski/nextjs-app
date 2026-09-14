@@ -1,14 +1,22 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
-import { PrismaModule } from "./prisma/prisma.module.js";
-import { UserModule } from "./modules/users/user.module.js";
-import { AuthModule } from "@/modules/auth/auth.module.js";
-import { RedisModule } from "@/common/redis/redis.module.js";
-import { MailerModule } from "@/common/mailer/mailer.module.js";
+import { PrismaModule } from './prisma/prisma.module.js';
+import { UserModule } from './modules/users/user.module.js';
+import { AuthModule } from '@/modules/auth/auth.module.js';
+import { RedisModule } from '@/common/redis/redis.module.js';
+import { MailerModule } from '@/common/mailer/mailer.module.js';
+import { RateLimitModule } from '@/common/reate-limit/rate-limit.module.js';
 
 @Module({
-  imports: [PrismaModule, UserModule, AuthModule, RedisModule, MailerModule],
+  imports: [
+    PrismaModule,
+    UserModule,
+    AuthModule,
+    RedisModule,
+    MailerModule,
+    RateLimitModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
