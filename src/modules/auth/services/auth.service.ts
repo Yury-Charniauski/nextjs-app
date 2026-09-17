@@ -2,20 +2,25 @@ import { MailerService } from '@/common/mailer/mailer.service.js';
 import { RateLimitService } from '@/common/rate-limit/rate-limit.service.js';
 import { UserStatus } from '@/generated/prisma/enums.js';
 import { ConfirmEmailDto } from '@/modules/auth/dto/confirm-email.dto.js';
+import { LoginDto } from '@/modules/auth/dto/login.dto.js';
 import { RegisterDto } from '@/modules/auth/dto/register.dto.js';
 import { ResendOtpDto } from '@/modules/auth/dto/resend-otp.dto.js';
 import { OtpService } from '@/modules/auth/services/otp.service.js';
+import { TJwtServicePayload } from '@/modules/auth/types/jwt-service.js';
 import { UserService } from '@/modules/users/user.service.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   Injectable,
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -28,6 +33,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly mailerService: MailerService,
     private readonly rateLimitService: RateLimitService,
+    private readonly jwtService: JwtService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{
@@ -133,5 +139,72 @@ export class AuthService {
 
     this.logger.log(`Resend success: userId=${dto.userId}`);
     return { message: 'Verification code send.' };
+  }
+
+  async login(dto: LoginDto) {
+    const email = dto.email.toLowerCase();
+    const existUser = await this.userService.findByEmail(email);
+
+    if (
+      !existUser ||
+      !(await bcrypt.compare(dto.password, existUser.password)) ||
+      existUser.status !== UserStatus.ACTIVE
+    ) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const accessToken = this.jwtService.sign({
+      sub: existUser.id,
+      type: 'access',
+    });
+    const refreshToken = this.jwtService.sign(
+      { sub: existUser.id, type: 'refresh' },
+      {
+        secret: process.env.JWT_REFRESH_SECRET,
+        expiresIn: '30d',
+      },
+    );
+
+    this.logger.log('Login success');
+    return { accessToken, refreshToken };
+  }
+
+  async refresh(token: string) {
+    let payload: null | TJwtServicePayload = null;
+    try {
+      payload = this.jwtService.verify<TJwtServicePayload>(token, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
+    } catch {
+      throw new UnauthorizedException('Unauthorized user');
+    }
+
+    if (
+      !payload ||
+      payload.type !== 'refresh' ||
+      typeof payload.sub !== 'string'
+    ) {
+      throw new UnauthorizedException('Unauthorized user');
+    }
+
+    const user = await this.userService.findOne(payload.sub);
+
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException('Access is forbidden');
+    }
+
+    const accessToken = this.jwtService.sign({
+      sub: user.id,
+      type: 'access',
+    });
+    const refreshToken = this.jwtService.sign(
+      { sub: user.id, type: 'refresh' },
+      {
+        secret: process.env.JWT_REFRESH_SECRET,
+        expiresIn: '30d',
+      },
+    );
+
+    return { accessToken, refreshToken };
   }
 }
