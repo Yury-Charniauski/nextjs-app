@@ -31,6 +31,7 @@ model User {
   status    UserStatus @default(PENDING)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+  userRoles UserRole[]
 
   @@map("users")
 }
@@ -43,4 +44,45 @@ model SystemSetting {
   updatedAt                            DateTime @updatedAt
 
   @@map("system_settings")
+}
+
+model Role {
+  id          String     @id @default(uuid())
+  name        String     @unique
+  description String?
+  grants      Grant[]
+  userRoles   UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id      String   @id @default(uuid())
+  name    String   @unique
+  actions String[]
+  grants  Grant[]
+
+  @@map("permission")
+}
+
+model Grant {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  actions      String[]
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+  @@map("grants")
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User   @relation(fields: [userId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+  @@map("user_roles")
 }
