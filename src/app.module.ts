@@ -7,6 +7,7 @@ import { AuthModule } from '@/modules/auth/auth.module.js';
 import { RedisModule } from '@/common/redis/redis.module.js';
 import { MailerModule } from '@/common/mailer/mailer.module.js';
 import { RateLimitModule } from '@/common/rate-limit/rate-limit.module.js';
+import { RbacModule } from "@/modules/rbac/rbac.module.js";
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { RateLimitModule } from '@/common/rate-limit/rate-limit.module.js';
     RedisModule,
     MailerModule,
     RateLimitModule,
+    RbacModule,
   ],
   controllers: [AppController],
   providers: [AppService],

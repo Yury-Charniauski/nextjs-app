@@ -1,1 +1,1 @@
-export type TJwtServicePayload = {sub: string, type: 'access' | 'refresh'}
+export type TJwtServicePayload = { sub: string; type: 'access' | 'refresh' };

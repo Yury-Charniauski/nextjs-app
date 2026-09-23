@@ -1,5 +1,4 @@
 import { AuthController } from '@/modules/auth/auth.controller.js';
-import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard.js';
 import { AuthService } from '@/modules/auth/services/auth.service.js';
 import { OtpService } from '@/modules/auth/services/otp.service.js';
 import { JwtStrategy } from '@/modules/auth/strategies/jwt.strategy.js';
