@@ -40,7 +40,7 @@ export class RolesGuard implements CanActivate {
 
     if (!hasRole) {
       this.logger.warn(
-        `Access denied: userId=${userId}, required roles: ${requiredRoles.join(',')}`,
+        `Access denied: userId=${userId}, required roles: ${requiredRoles.join(', ')}`,
       );
 
       throw new ForbiddenException('Access is forbidden');
