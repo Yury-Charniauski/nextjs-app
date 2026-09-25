@@ -1,3 +1,4 @@
+import { AuditModule } from '@/common/audit/audit.module.js';
 import { GrantController } from '@/modules/rbac/controllers/grant.controller.js';
 import { PermissionController } from '@/modules/rbac/controllers/permission.controller.js';
 import { RolesController } from '@/modules/rbac/controllers/roles.controller.js';
@@ -18,6 +19,6 @@ import { PassportModule } from '@nestjs/passport';
   ],
   exports: [RbacService],
   controllers: [RolesController, PermissionController, GrantController],
-  imports: [PassportModule.register({ defaultStrategy: 'jwt' })],
+  imports: [PassportModule.register({ defaultStrategy: 'jwt' }), AuditModule],
 })
 export class RbacModule {}

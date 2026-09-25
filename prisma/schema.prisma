@@ -86,3 +86,15 @@ model UserRole {
   @@id([userId, roleId])
   @@map("user_roles")
 }
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}

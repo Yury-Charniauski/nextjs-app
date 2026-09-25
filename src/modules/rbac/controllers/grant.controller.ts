@@ -1,3 +1,4 @@
+import { CurrentUser } from '@/common/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard.js';
 import { Roles } from '@/modules/rbac/decorators/roles.js';
 import { CreateGrantDto } from '@/modules/rbac/dto/create-grant.dto.js';
@@ -27,17 +28,21 @@ export class GrantController {
   }
 
   @Post()
-  create(@Body() dto: CreateGrantDto) {
-    return this.grantService.create(dto);
+  create(@Body() dto: CreateGrantDto, @CurrentUser() user: { userId: string }) {
+    return this.grantService.create(dto, user.userId);
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateGrantDto) {
-    return this.grantService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateGrantDto,
+    @CurrentUser() user: { userId: string },
+  ) {
+    return this.grantService.update(id, dto, user.userId);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.grantService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: { userId: string }) {
+    return this.grantService.remove(id, user.userId);
   }
 }

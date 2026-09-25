@@ -1,3 +1,4 @@
+import { CurrentUser } from "@/common/decorators/current-user.decorator.js";
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard.js';
 import { Roles } from '@/modules/rbac/decorators/roles.js';
 import { CreatePermissionDto } from '@/modules/rbac/dto/create-permission.dto.js';
@@ -27,17 +28,24 @@ export class PermissionController {
   }
 
   @Post()
-  create(@Body() dto: CreatePermissionDto) {
-    return this.permissionService.create(dto);
+  create(
+    @Body() dto: CreatePermissionDto,
+    @CurrentUser() user: { userId: string },
+  ) {
+    return this.permissionService.create(dto, user.userId);
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() dto: UpdatePermissionDto) {
-    return this.permissionService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdatePermissionDto,
+    @CurrentUser() user: { userId: string },
+  ) {
+    return this.permissionService.update(id, dto, user.userId);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.permissionService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: { userId: string }) {
+    return this.permissionService.remove(id, user.userId);
   }
 }
