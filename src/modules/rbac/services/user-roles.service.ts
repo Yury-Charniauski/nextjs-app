@@ -20,7 +20,7 @@ export class UserRoleService {
     });
   }
 
-  async assign(userId: string, roleId: string, actorId: string) {
+  async assign(userId: string, roleId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
@@ -37,7 +37,6 @@ export class UserRoleService {
 
       await this.auditService.log(
         {
-          actorId,
           action: 'create',
           entity: 'userRole',
           entityId: userId,
@@ -51,7 +50,7 @@ export class UserRoleService {
     return userRole;
   }
 
-  async revoke(userId: string, roleId: string, actorId: string) {
+  async revoke(userId: string, roleId: string) {
     await this.prisma.$transaction(async (tx) => {
       await tx.userRole.delete({
         where: {
@@ -61,7 +60,6 @@ export class UserRoleService {
 
       await this.auditService.log(
         {
-          actorId,
           action: 'delete',
           entity: 'userRole',
           entityId: userId,

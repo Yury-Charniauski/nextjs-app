@@ -41,7 +41,7 @@ export class GrantAdminService {
     return this.prisma.grant.findMany();
   }
 
-  async create(dto: CreateGrantDto, actorId: string) {
+  async create(dto: CreateGrantDto) {
     await this.assertActionAllowed(dto.permissionId, dto.actions);
 
     const grant = await this.prisma.$transaction(async (tx) => {
@@ -51,7 +51,6 @@ export class GrantAdminService {
 
       await this.auditService.log(
         {
-          actorId,
           action: 'create',
           entity: 'grant',
           entityId: created.id,
@@ -67,7 +66,7 @@ export class GrantAdminService {
     return grant;
   }
 
-  async update(id: string, dto: UpdateGrantDto, actorId: string) {
+  async update(id: string, dto: UpdateGrantDto) {
     const existing = await this.prisma.grant.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Grant not found');
 
@@ -81,7 +80,6 @@ export class GrantAdminService {
 
       await this.auditService.log(
         {
-          actorId,
           action: 'update',
           entity: 'grant',
           entityId: updated.id,
@@ -96,13 +94,12 @@ export class GrantAdminService {
     return grant;
   }
 
-  async remove(id: string, actorId: string) {
+  async remove(id: string) {
     await this.prisma.$transaction(async (tx) => {
       await tx.grant.delete({ where: { id } });
 
       await this.auditService.log(
         {
-          actorId,
           action: 'delete',
           entity: 'grant',
           entityId: id,

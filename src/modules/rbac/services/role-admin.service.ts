@@ -3,7 +3,12 @@ import { CreateRoleDto } from '@/modules/rbac/dto/create-role.dto.js';
 import { UpdateRoleDto } from '@/modules/rbac/dto/update-role.dto.js';
 import { RbacService } from '@/modules/rbac/services/rbac.service.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 
 @Injectable()
 export class RoleAdminService {
@@ -18,7 +23,7 @@ export class RoleAdminService {
     return this.prisma.role.findMany();
   }
 
-  async create(dto: CreateRoleDto, actorId: string) {
+  async create(dto: CreateRoleDto) {
     const role = await this.prisma.$transaction(async (tx) => {
       const created = await tx.role.create({
         data: dto,
@@ -26,7 +31,6 @@ export class RoleAdminService {
 
       await this.auditService.log(
         {
-          actorId,
           action: 'create',
           entity: 'role',
           entityId: created.id,
@@ -42,7 +46,7 @@ export class RoleAdminService {
     return role;
   }
 
-  async update(id: string, dto: UpdateRoleDto, actorId: string) {
+  async update(id: string, dto: UpdateRoleDto) {
     const updatedRole = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.role.update({
         where: {
@@ -53,7 +57,6 @@ export class RoleAdminService {
 
       await this.auditService.log(
         {
-          actorId,
           action: 'update',
           entity: 'role',
           entityId: updated.id,
@@ -68,8 +71,28 @@ export class RoleAdminService {
     return updatedRole;
   }
 
-  async remove(id: string, actorId: string) {
+  async remove(id: string) {
     await this.prisma.$transaction(async (tx) => {
+      const role = await tx.role.findUnique({
+        where: { id },
+        include: {
+          _count: {
+            select: {
+              grants: true,
+              userRoles: true,
+            },
+          },
+        },
+      });
+
+      if (!role) {
+        throw new NotFoundException('Role not found');
+      }
+
+      if (role._count.grants !== 0 || role._count.userRoles !== 0) {
+        throw new ConflictException('Role is in use');
+      }
+
       await tx.role.delete({
         where: {
           id,
@@ -78,7 +101,6 @@ export class RoleAdminService {
 
       await this.auditService.log(
         {
-          actorId,
           action: 'delete',
           entity: 'role',
           entityId: id,

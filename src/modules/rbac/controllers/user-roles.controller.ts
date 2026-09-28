@@ -1,4 +1,3 @@
-import { CurrentUser } from '@/common/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard.js';
 import { Roles } from '@/modules/rbac/decorators/roles.js';
 import { AssignRoleDto } from '@/modules/rbac/dto/assign-role.dto.js';
@@ -29,18 +28,15 @@ export class UserRoleController {
   assign(
     @Param('userId') userId: string,
     @Body() dto: AssignRoleDto,
-    @CurrentUser() user: { userId: string },
   ) {
-    return this.userRoleService.assign(userId, dto.roleId, user.userId);
+    return this.userRoleService.assign(userId, dto.roleId);
   }
 
   @Delete(':userId/roles/:roleId')
   revoke(
     @Param('userId') userId: string,
     @Param('roleId') roleId: string,
-    @CurrentUser() user: { userId: string },
   ) {
-    return this.userRoleService.revoke(userId, roleId, user.userId);
+    return this.userRoleService.revoke(userId, roleId);
   }
-
 }

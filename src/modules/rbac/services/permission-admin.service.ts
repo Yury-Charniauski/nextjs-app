@@ -17,7 +17,7 @@ export class PermissionAdminService {
     return this.prisma.permission.findMany();
   }
 
-  async create(dto: CreatePermissionDto, actorId: string) {
+  async create(dto: CreatePermissionDto) {
     const permission = await this.prisma.$transaction(async (tx) => {
       const created = await tx.permission.create({
         data: dto,
@@ -25,7 +25,6 @@ export class PermissionAdminService {
 
       await this.auditService.log(
         {
-          actorId,
           action: 'create',
           entity: 'permission',
           entityId: created.id,
@@ -41,7 +40,7 @@ export class PermissionAdminService {
     return permission;
   }
 
-  async update(id: string, dto: UpdatePermissionDto, actorId: string) {
+  async update(id: string, dto: UpdatePermissionDto) {
     const updatedPermission = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.permission.update({
         where: {
@@ -52,7 +51,6 @@ export class PermissionAdminService {
 
       await this.auditService.log(
         {
-          actorId,
           action: 'update',
           entity: 'permission',
           entityId: updated.id,
@@ -67,7 +65,7 @@ export class PermissionAdminService {
     return updatedPermission;
   }
 
-  async remove(id: string, actorId: string) {
+  async remove(id: string) {
     await this.prisma.$transaction(async (tx) => {
       await tx.permission.delete({
         where: {
@@ -77,7 +75,6 @@ export class PermissionAdminService {
 
       await this.auditService.log(
         {
-          actorId,
           action: 'delete',
           entity: 'permission',
           entityId: id,

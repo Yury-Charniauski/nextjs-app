@@ -1,10 +1,9 @@
-import { Controller, Get, Param, Req, UseGuards } from '@nestjs/common';
-import { UserService } from './user.service.js';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard.js';
-import { type Request } from 'express';
-import { PermissionGuard } from '@/modules/rbac/guards/permissions.guard.js';
 import { RequirePermission } from '@/modules/rbac/decorators/require-permission.js';
-// import { CreateUserDto } from "./dto/create-user.dto.js";
+import { PermissionGuard } from '@/modules/rbac/guards/permissions.guard.js';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { type Request } from 'express';
+import { UserService } from './user.service.js';
 
 type AuthRequest = Request & { user: { userId: string } };
 
@@ -12,10 +11,6 @@ type AuthRequest = Request & { user: { userId: string } };
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  // @Post()
-  // create(@Body() createUserDto: CreateUserDto) {
-  // 	return this.userService.create(createUserDto)
-  // }
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission('users', 'read')
   @Get()
@@ -27,10 +22,5 @@ export class UserController {
   @Get('me')
   async getProfile(@Req() req: AuthRequest) {
     return await this.userService.findOne(req.user.userId);
-  }
-
-  @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return await this.userService.findOne(id);
   }
 }

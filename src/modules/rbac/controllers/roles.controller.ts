@@ -1,4 +1,3 @@
-import { CurrentUser } from '@/common/decorators/current-user.decorator.js';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard.js';
 import { Roles } from '@/modules/rbac/decorators/roles.js';
 import { CreateRoleDto } from '@/modules/rbac/dto/create-role.dto.js';
@@ -27,21 +26,17 @@ export class RolesController {
   }
 
   @Post()
-  create(@Body() dto: CreateRoleDto, @CurrentUser() user: { userId: string }) {
-    return this.roleAdmin.create(dto, user.userId);
+  create(@Body() dto: CreateRoleDto) {
+    return this.roleAdmin.create(dto);
   }
 
   @Put(':id')
-  update(
-    @Param('id') id: string,
-    @Body() dto: UpdateRoleDto,
-    @CurrentUser() user: { userId: string },
-  ) {
-    return this.roleAdmin.update(id, dto, user.userId);
+  update(@Param('id') id: string, @Body() dto: UpdateRoleDto) {
+    return this.roleAdmin.update(id, dto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string, @CurrentUser() user: { userId: string }) {
-    return this.roleAdmin.remove(id, user.userId);
+  remove(@Param('id') id: string) {
+    return this.roleAdmin.remove(id);
   }
 }
