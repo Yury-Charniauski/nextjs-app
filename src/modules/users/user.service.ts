@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { UserStatus } from '@/generated/prisma/enums.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
 
@@ -7,14 +7,29 @@ export class UserService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: { email: string; password: string; status: UserStatus }) {
-    return this.prisma.user.create({
-      data,
-      select: {
-        id: true,
-        email: true,
-        status: true,
-        createdAt: true,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const defaultRole = await tx.role.findUnique({ where: { name: 'user' } });
+
+      if (!defaultRole) {
+        throw new InternalServerErrorException(
+          'Default role is not configured',
+        );
+      }
+
+      const created = await tx.user.create({
+        data,
+        select: {
+          id: true,
+          email: true,
+          status: true,
+        },
+      });
+
+      await tx.userRole.create({
+        data: { userId: created.id, roleId: defaultRole.id },
+      });
+
+      return created;
     });
   }
 
@@ -32,7 +47,7 @@ export class UserService {
   async findOne(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
-      select: {id: true, email: true, status: true}
+      select: { id: true, email: true, status: true },
     });
   }
 

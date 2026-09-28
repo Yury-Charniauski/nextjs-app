@@ -10,8 +10,8 @@ export class AuditService {
   async log(
     entry: {
       actorId: string;
-      action: string;
-      entity: string;
+      action: 'create' | 'update' | 'delete';
+      entity: 'role' | 'permission' | 'grant' | 'userRole';
       entityId?: string;
       metadata?: Prisma.InputJsonValue;
     },
