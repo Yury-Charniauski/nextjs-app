@@ -6,6 +6,8 @@ import { AuthService } from '@/modules/auth/services/auth.service.js';
 import {
   Body,
   Controller,
+  HttpCode,
+  HttpStatus,
   Post,
   Req,
   Res,
@@ -29,10 +31,11 @@ export class AuthController {
 
   @Post('resend-otp')
   resendOtp(@Body() dto: ResendOtpDto) {
-    return this.authService.resendOtp(dto);
+    return this.authService.resendOtp(dto, 'registration');
   }
 
   @Post('login')
+  @HttpCode(HttpStatus.OK)
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
@@ -58,6 +61,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @HttpCode(HttpStatus.OK)
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -89,6 +93,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @HttpCode(HttpStatus.OK)
   async logout(@Res({ passthrough: true }) res: Response) {
     res.clearCookie('access_token', { path: '/' });
     res.clearCookie('refresh_token', { path: '/auth/refresh' });

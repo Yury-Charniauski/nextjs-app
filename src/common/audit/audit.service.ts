@@ -14,7 +14,7 @@ export class AuditService {
   async log(
     entry: {
       action: 'create' | 'update' | 'delete';
-      entity: 'role' | 'permission' | 'grant' | 'userRole';
+      entity: 'role' | 'permission' | 'grant' | 'userRole' | 'user';
       entityId?: string;
       metadata?: Prisma.InputJsonValue;
     },

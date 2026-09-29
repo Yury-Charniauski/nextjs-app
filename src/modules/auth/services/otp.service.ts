@@ -11,6 +11,7 @@ import { Redis } from 'ioredis';
 interface OtpData {
   code: string;
   attempts: number;
+  newEmail?: string;
 }
 
 @Injectable()
@@ -25,8 +26,12 @@ export class OtpService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
-  async createOtp(userId: string): Promise<string> {
-    const rateLimitKey = `ratelimit:otp:registration:${userId}`;
+  async createOtp(
+    userId: string,
+    purpose: 'registration' | 'email-change',
+    newEmail?: string,
+  ): Promise<string> {
+    const rateLimitKey = `ratelimit:otp:${purpose}:${userId}`;
     const isRateLimited = await this.redis.get(rateLimitKey);
 
     if (isRateLimited) {
@@ -37,8 +42,8 @@ export class OtpService {
     }
 
     const code = this.generateCode();
-    const otpKey = `otp:registration:${userId}`;
-    const data: OtpData = { code, attempts: 0 };
+    const otpKey = `otp:${purpose}:${userId}`;
+    const data: OtpData = { code, attempts: 0, ...(newEmail && { newEmail }) };
 
     await this.redis.set(otpKey, JSON.stringify(data), 'EX', this.OTP_TTL);
     await this.redis.set(rateLimitKey, '1', 'EX', this.RESEND_TTL);
@@ -46,8 +51,12 @@ export class OtpService {
     return code;
   }
 
-  async verifyOtp(userId: string, inputCode: string): Promise<boolean> {
-    const otpKey = `otp:registration:${userId}`;
+  async verifyOtp<T extends string | boolean>(
+    userId: string,
+    inputCode: string,
+    purpose: 'registration' | 'email-change',
+  ): Promise<T> {
+    const otpKey = `otp:${purpose}:${userId}`;
     const rawData = await this.redis.get(otpKey);
 
     if (!rawData) {
@@ -72,9 +81,20 @@ export class OtpService {
         await this.redis.set(otpKey, JSON.stringify(data), 'EX', ttl);
         throw new BadRequestException('Invalid or expired verification code.');
       }
+      throw new BadRequestException('Verification code is does not correct');
+    }
+
+    if (purpose === 'email-change') {
+      if (!data.newEmail) {
+        throw new BadRequestException(
+          'Verification code expires or does not exist',
+        );
+      }
+      await this.redis.del(otpKey);
+      return data.newEmail as T;
     }
 
     await this.redis.del(otpKey);
-    return true;
+    return true as T;
   }
 }

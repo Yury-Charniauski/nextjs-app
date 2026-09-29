@@ -75,8 +75,8 @@ export class AuthService {
     });
 
     if (requireConfirmation) {
-      const code = await this.otpService.createOtp(user.id);
-      this.mailerService.sendRegistrationOtp(user.email, code);
+      const code = await this.otpService.createOtp(user.id, 'registration');
+      this.mailerService.sendOtp(user.email, code);
     }
 
     this.logger.log(
@@ -105,7 +105,8 @@ export class AuthService {
       throw new BadRequestException('Status already is Active/Blocked');
     }
 
-    await this.otpService.verifyOtp(userId, code);
+    await this.otpService.verifyOtp(userId, code, 'registration');
+
     const user = await this.userService.updateStatus(
       dto.userId,
       UserStatus.ACTIVE,
@@ -115,7 +116,7 @@ export class AuthService {
     return { userId: user.id, email: user.email, status: user.status };
   }
 
-  async resendOtp(dto: ResendOtpDto) {
+  async resendOtp(dto: ResendOtpDto, purpose: 'registration' | 'email-change') {
     const existUser = await this.userService.findOne(dto.userId);
 
     if (!existUser) {
@@ -128,8 +129,8 @@ export class AuthService {
     }
 
     try {
-      const code = await this.otpService.createOtp(dto.userId);
-      this.mailerService.sendRegistrationOtp(existUser.email, code);
+      const code = await this.otpService.createOtp(dto.userId, purpose);
+      this.mailerService.sendOtp(existUser.email, code);
     } catch (e) {
       if (e instanceof HttpException && e.getStatus() === 429) {
         this.logger.warn(`Resend OTP failed: Verification code already sent.`);

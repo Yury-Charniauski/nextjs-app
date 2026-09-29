@@ -8,7 +8,7 @@ export class MailerService {
     port: Number(process.env.SMTP_PORT),
   });
 
-  async sendRegistrationOtp(email: string, code: string) {
+  async sendOtp(email: string, code: string) {
     await this.transport.sendMail({
       from: process.env.SMTP_FROM,
       to: email,
