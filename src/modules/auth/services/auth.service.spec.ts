@@ -1,17 +1,25 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { AuditService } from '@/common/audit/audit.service.js';
+import { MailerService } from '@/common/mailer/mailer.service.js';
+import { RateLimitService } from '@/common/rate-limit/rate-limit.service.js';
+import { ConfirmEmailDto } from '@/modules/auth/dto/confirm-email.dto.js';
+import { LoginDto } from '@/modules/auth/dto/login.dto.js';
+import { RegisterDto } from '@/modules/auth/dto/register.dto.js';
+import { OtpService } from '@/modules/auth/services/otp.service.js';
+import { UserService } from '@/modules/users/user.service.js';
+import { PrismaService } from '@/prisma/prisma.service.js';
+import { UserStatus } from '@/generated/prisma/enums.js';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   InternalServerErrorException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { Test, TestingModule } from '@nestjs/testing';
+import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service.js';
-import { UserService } from '@/modules/users/user.service.js';
-import { OtpService } from '@/modules/auth/services/otp.service.js';
-import { PrismaService } from '@/prisma/prisma.service.js';
-import { UserStatus } from '@/generated/prisma/enums.js';
-import { RegisterDto } from '@/modules/auth/dto/register.dto.js';
-import { ConfirmEmailDto } from '@/modules/auth/dto/confirm-email.dto.js';
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -34,6 +42,24 @@ describe('AuthService', () => {
     },
   };
 
+  const mailerService = {
+    sendOtp: vi.fn(),
+  };
+
+  const rateLimitService = {
+    consume: vi.fn(),
+  };
+
+  const jwtService = {
+    sign: vi.fn(),
+    verify: vi.fn(),
+  };
+
+  const auditService = {
+    authLog: vi.fn(),
+    log: vi.fn(),
+  };
+
   const registerDto: RegisterDto = {
     email: 'user@test.com',
     password: 'Password1',
@@ -48,6 +74,10 @@ describe('AuthService', () => {
         { provide: UserService, useValue: userService },
         { provide: OtpService, useValue: otpService },
         { provide: PrismaService, useValue: prisma },
+        { provide: MailerService, useValue: mailerService },
+        { provide: RateLimitService, useValue: rateLimitService },
+        { provide: JwtService, useValue: jwtService },
+        { provide: AuditService, useValue: auditService },
       ],
     }).compile();
 
@@ -87,7 +117,10 @@ describe('AuthService', () => {
       const createArg = userService.create.mock.calls[0][0];
       expect(createArg.password).not.toBe(registerDto.password);
 
-      expect(otpService.createOtp).toHaveBeenCalledWith('user-1');
+      expect(otpService.createOtp).toHaveBeenCalledWith(
+        'user-1',
+        'registration',
+      );
     });
 
     it('creates ACTIVE user and skips OTP when confirmation is disabled', async () => {
@@ -162,7 +195,11 @@ describe('AuthService', () => {
         email: 'user@test.com',
         status: UserStatus.ACTIVE,
       });
-      expect(otpService.verifyOtp).toHaveBeenCalledWith('user-1', '123456');
+      expect(otpService.verifyOtp).toHaveBeenCalledWith(
+        'user-1',
+        '123456',
+        'registration',
+      );
       expect(userService.updateStatus).toHaveBeenCalledWith(
         'user-1',
         UserStatus.ACTIVE,
@@ -206,6 +243,114 @@ describe('AuthService', () => {
         BadRequestException,
       );
       expect(userService.updateStatus).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('login', () => {
+    const loginDto: LoginDto = {
+      email: 'User@test.com',
+      password: 'Password1',
+    };
+    const normalizedEmail = 'user@test.com';
+    let passwordHash: string;
+
+    beforeAll(async () => {
+      passwordHash = await bcrypt.hash(loginDto.password, 4);
+    });
+
+    function activeUser(status: UserStatus = UserStatus.ACTIVE) {
+      return {
+        id: 'user-1',
+        email: normalizedEmail,
+        password: passwordHash,
+        status,
+      };
+    }
+
+    it('returns 401 and LOGIN_FAILED when the email is unknown', async () => {
+      userService.findByEmail.mockResolvedValue(null);
+
+      await expect(authService.login(loginDto)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+
+      expect(userService.findByEmail).toHaveBeenCalledWith(normalizedEmail);
+      expect(auditService.authLog).toHaveBeenCalledWith({
+        action: 'LOGIN_FAILED',
+        actorId: null,
+        metadata: { email: normalizedEmail, reason: 'invalid_credentials' },
+      });
+      expect(jwtService.sign).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 and LOGIN_FAILED when the password does not match', async () => {
+      userService.findByEmail.mockResolvedValue(activeUser());
+
+      await expect(
+        authService.login({ ...loginDto, password: 'wrong-password' }),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+
+      expect(auditService.authLog).toHaveBeenCalledWith({
+        action: 'LOGIN_FAILED',
+        actorId: 'user-1',
+        entityId: 'user-1',
+        metadata: { email: normalizedEmail, reason: 'invalid_credentials' },
+      });
+      expect(jwtService.sign).not.toHaveBeenCalled();
+    });
+
+    it.each([UserStatus.PENDING, UserStatus.BLOCKED])(
+      'returns 403 and LOGIN_FAILED when the account is %s',
+      async (status) => {
+        userService.findByEmail.mockResolvedValue(activeUser(status));
+
+        await expect(authService.login(loginDto)).rejects.toBeInstanceOf(
+          ForbiddenException,
+        );
+
+        expect(auditService.authLog).toHaveBeenCalledWith({
+          action: 'LOGIN_FAILED',
+          actorId: 'user-1',
+          entityId: 'user-1',
+          metadata: { email: normalizedEmail, reason: status },
+        });
+        expect(jwtService.sign).not.toHaveBeenCalled();
+      },
+    );
+
+    it('returns tokens and writes LOGIN_SUCCESS for an active user', async () => {
+      userService.findByEmail.mockResolvedValue(activeUser());
+      jwtService.sign.mockImplementation(
+        (payload: { type: string }) => `${payload.type}-token`,
+      );
+
+      const result = await authService.login(loginDto);
+
+      expect(result).toEqual({
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+      });
+      expect(jwtService.sign).toHaveBeenNthCalledWith(1, {
+        sub: 'user-1',
+        type: 'access',
+      });
+      expect(jwtService.sign).toHaveBeenNthCalledWith(
+        2,
+        { sub: 'user-1', type: 'refresh' },
+        {
+          secret: process.env.JWT_REFRESH_SECRET,
+          expiresIn: '30d',
+        },
+      );
+      expect(auditService.authLog).toHaveBeenCalledWith({
+        action: 'LOGIN_SUCCESS',
+        actorId: 'user-1',
+        entityId: 'user-1',
+        metadata: { email: normalizedEmail },
+      });
+      expect(auditService.authLog.mock.calls[0][0].metadata).not.toHaveProperty(
+        'password',
+      );
     });
   });
 });

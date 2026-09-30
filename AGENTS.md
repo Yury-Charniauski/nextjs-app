@@ -32,6 +32,7 @@
 - **NO Unsanctioned Changes**: Do NOT change directory structures or modify existing code without prior approval from the developer.
 - **Incremental Steps Only**: Discuss and confirm each change before moving to the next step.
 - **File Integrity**: When edits *are* requested, keep modifications minimal and isolated.
+- **Source ownership**: The developer is the only person who edits files that do not end with `.spec.ts` or `.spec.js`. The agent may edit `*.spec.ts` and `*.spec.js` only when the current message explicitly asks for tests. Any other file may be changed only when the current message explicitly asks for that change. A request to add tests is not permission to change the implementation so the tests pass.
 
 ## 6. Error Handling & Troubleshooting
 - When presented with terminal or compiler errors:

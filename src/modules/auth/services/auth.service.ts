@@ -1,3 +1,4 @@
+import { AuditService } from '@/common/audit/audit.service.js';
 import { MailerService } from '@/common/mailer/mailer.service.js';
 import { RateLimitService } from '@/common/rate-limit/rate-limit.service.js';
 import { UserStatus } from '@/generated/prisma/enums.js';
@@ -34,6 +35,7 @@ export class AuthService {
     private readonly mailerService: MailerService,
     private readonly rateLimitService: RateLimitService,
     private readonly jwtService: JwtService,
+    private readonly auditService: AuditService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{
@@ -148,10 +150,25 @@ export class AuthService {
 
     if (
       !existUser ||
-      !(await bcrypt.compare(dto.password, existUser.password)) ||
-      existUser.status !== UserStatus.ACTIVE
+      !(await bcrypt.compare(dto.password, existUser.password))
     ) {
+      await this.auditService.authLog({
+        action: 'LOGIN_FAILED',
+        actorId: existUser?.id ?? null,
+        ...(existUser ? { entityId: existUser.id } : {}),
+        metadata: { email, reason: 'invalid_credentials' },
+      });
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (existUser.status !== UserStatus.ACTIVE) {
+      await this.auditService.authLog({
+        action: 'LOGIN_FAILED',
+        actorId: existUser.id,
+        entityId: existUser.id,
+        metadata: { email, reason: existUser.status },
+      });
+      throw new ForbiddenException('Account is disabled');
     }
 
     const accessToken = this.jwtService.sign({
@@ -167,6 +184,12 @@ export class AuthService {
     );
 
     this.logger.log('Login success');
+    await this.auditService.authLog({
+      action: 'LOGIN_SUCCESS',
+      actorId: existUser.id,
+      entityId: existUser.id,
+      metadata: { email },
+    });
     return { accessToken, refreshToken };
   }
 

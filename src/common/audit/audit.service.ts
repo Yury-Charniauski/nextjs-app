@@ -1,7 +1,12 @@
-import { Prisma } from '../../generated/prisma/client.js';
+import {
+  AdminAuditEntry,
+  AuditWriteEntry,
+  AuthAuditEntry,
+} from '@/common/audit/types/audit.types.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
 import { Injectable, Logger } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
+import { Prisma } from '../../generated/prisma/client.js';
 
 @Injectable()
 export class AuditService {
@@ -11,32 +16,43 @@ export class AuditService {
     private readonly cls: ClsService,
   ) {}
 
-  async log(
-    entry: {
-      action: 'create' | 'update' | 'delete';
-      entity: 'role' | 'permission' | 'grant' | 'userRole' | 'user';
-      entityId?: string;
-      metadata?: Prisma.InputJsonValue;
-    },
+  private async write(
+    { action, entity, entityId, actorId, metadata }: AuditWriteEntry,
     db: Prisma.TransactionClient | PrismaService = this.prisma,
   ) {
-    const actorId = this.cls.get<string>('actorId');
-
     await db.auditLog.create({
       data: {
-        ...entry,
-        actorId,
+        action: action,
+        entity: entity,
+        entityId: entityId,
+        actorId: actorId ?? null,
         metadata: {
-          ...(typeof entry.metadata === 'object' &&
-          entry.metadata !== null &&
-          !Array.isArray(entry.metadata)
-            ? entry.metadata
+          ...(typeof metadata === 'object' &&
+          metadata !== null &&
+          !Array.isArray(metadata)
+            ? metadata
             : {}),
           method: this.cls.get<string>('method'),
           uri: this.cls.get<string>('uri'),
         },
       },
     });
-    this.logger.log(`${entry.action} by ${actorId} (${entry.entityId ?? '-'})`);
+    this.logger.log(`${action} by ${actorId} (${entityId ?? '-'})`);
+  }
+
+  async log(
+    entry: AdminAuditEntry,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const actorId = this.cls.get<string>('actorId') ?? null;
+
+    await this.write({ ...entry, actorId }, db);
+  }
+
+  async authLog(
+    entry: AuthAuditEntry,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    await this.write({ ...entry, entity: 'auth' }, db);
   }
 }

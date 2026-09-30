@@ -89,7 +89,7 @@ model UserRole {
 
 model AuditLog {
   id        String   @id @default(uuid())
-  actorId   String
+  actorId   String?
   action    String
   entity    String
   entityId  String?

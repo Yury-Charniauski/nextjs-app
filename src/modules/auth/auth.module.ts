@@ -1,3 +1,4 @@
+import { AuditModule } from "@/common/audit/audit.module.js";
 import { AuthController } from '@/modules/auth/auth.controller.js';
 import { AuthService } from '@/modules/auth/services/auth.service.js';
 import { OtpService } from '@/modules/auth/services/otp.service.js';
@@ -16,6 +17,7 @@ const passportModule = PassportModule.register({ defaultStrategy: 'jwt' });
       signOptions: { expiresIn: '15m' },
     }),
     passportModule,
+    AuditModule
   ],
   controllers: [AuthController],
   providers: [AuthService, OtpService, JwtStrategy],
