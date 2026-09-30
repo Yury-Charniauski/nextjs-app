@@ -15,6 +15,7 @@ import {
   ConflictException,
   ForbiddenException,
   HttpException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -144,9 +145,19 @@ export class AuthService {
     return { message: 'Verification code send.' };
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, ip?: string) {
     const email = dto.email.toLowerCase();
     const existUser = await this.userService.findByEmail(email);
+
+    if (await this.rateLimitService.isLoginBlocked(email, ip)) {
+      await this.auditService.authLog({
+        action: 'LOGIN_LOCKOUT',
+        actorId: existUser?.id ?? null,
+        metadata: { email, ip },
+      });
+
+      throw new HttpException('LOGIN_LOCKOUT', HttpStatus.TOO_MANY_REQUESTS);
+    }
 
     if (
       !existUser ||
@@ -158,6 +169,16 @@ export class AuthService {
         ...(existUser ? { entityId: existUser.id } : {}),
         metadata: { email, reason: 'invalid_credentials' },
       });
+
+      if (await this.rateLimitService.recordLoginFailure(email, ip)) {
+        await this.auditService.authLog({
+          action: 'LOGIN_LOCKOUT',
+          actorId: existUser?.id ?? null,
+          metadata: { email, ip },
+        });
+        throw new HttpException('LOGIN_LOCKOUT', HttpStatus.TOO_MANY_REQUESTS);
+      }
+
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -190,6 +211,7 @@ export class AuthService {
       entityId: existUser.id,
       metadata: { email },
     });
+    await this.rateLimitService.clearLoginFailure(email);
     return { accessToken, refreshToken };
   }
 

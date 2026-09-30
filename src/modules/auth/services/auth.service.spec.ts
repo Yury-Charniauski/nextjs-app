@@ -12,6 +12,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   InternalServerErrorException,
   NotFoundException,
   UnauthorizedException,
@@ -48,6 +50,9 @@ describe('AuthService', () => {
 
   const rateLimitService = {
     consume: vi.fn(),
+    isLoginBlocked: vi.fn().mockResolvedValue(false),
+    recordLoginFailure: vi.fn().mockResolvedValue(false),
+    clearLoginFailure: vi.fn().mockResolvedValue(undefined),
   };
 
   const jwtService = {
@@ -67,6 +72,9 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    rateLimitService.isLoginBlocked.mockResolvedValue(false);
+    rateLimitService.recordLoginFailure.mockResolvedValue(false);
+    rateLimitService.clearLoginFailure.mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -281,6 +289,11 @@ describe('AuthService', () => {
         metadata: { email: normalizedEmail, reason: 'invalid_credentials' },
       });
       expect(jwtService.sign).not.toHaveBeenCalled();
+      expect(rateLimitService.recordLoginFailure).toHaveBeenCalledWith(
+        normalizedEmail,
+        undefined,
+      );
+      expect(rateLimitService.clearLoginFailure).not.toHaveBeenCalled();
     });
 
     it('returns 401 and LOGIN_FAILED when the password does not match', async () => {
@@ -297,6 +310,10 @@ describe('AuthService', () => {
         metadata: { email: normalizedEmail, reason: 'invalid_credentials' },
       });
       expect(jwtService.sign).not.toHaveBeenCalled();
+      expect(rateLimitService.recordLoginFailure).toHaveBeenCalledWith(
+        normalizedEmail,
+        undefined,
+      );
     });
 
     it.each([UserStatus.PENDING, UserStatus.BLOCKED])(
@@ -315,6 +332,7 @@ describe('AuthService', () => {
           metadata: { email: normalizedEmail, reason: status },
         });
         expect(jwtService.sign).not.toHaveBeenCalled();
+        expect(rateLimitService.recordLoginFailure).not.toHaveBeenCalled();
       },
     );
 
@@ -351,6 +369,60 @@ describe('AuthService', () => {
       expect(auditService.authLog.mock.calls[0][0].metadata).not.toHaveProperty(
         'password',
       );
+      expect(rateLimitService.clearLoginFailure).toHaveBeenCalledWith(
+        normalizedEmail,
+      );
+    });
+
+    it('returns 429 and LOGIN_LOCKOUT when the account is already blocked', async () => {
+      userService.findByEmail.mockResolvedValue(activeUser());
+      rateLimitService.isLoginBlocked.mockResolvedValue(true);
+
+      const error = await authService
+        .login(loginDto, '127.0.0.1')
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getStatus()).toBe(
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+      expect(rateLimitService.recordLoginFailure).not.toHaveBeenCalled();
+      expect(auditService.authLog).toHaveBeenCalledWith({
+        action: 'LOGIN_LOCKOUT',
+        actorId: 'user-1',
+        metadata: { email: normalizedEmail, ip: '127.0.0.1' },
+      });
+      expect(jwtService.sign).not.toHaveBeenCalled();
+    });
+
+    it('returns 429 and LOGIN_LOCKOUT when the fifth failure reaches the limit', async () => {
+      userService.findByEmail.mockResolvedValue(activeUser());
+      rateLimitService.recordLoginFailure.mockResolvedValue(true);
+
+      const error = await authService
+        .login({ ...loginDto, password: 'wrong-password' }, '127.0.0.1')
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getStatus()).toBe(
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+      expect(auditService.authLog).toHaveBeenNthCalledWith(1, {
+        action: 'LOGIN_FAILED',
+        actorId: 'user-1',
+        entityId: 'user-1',
+        metadata: { email: normalizedEmail, reason: 'invalid_credentials' },
+      });
+      expect(auditService.authLog).toHaveBeenNthCalledWith(2, {
+        action: 'LOGIN_LOCKOUT',
+        actorId: 'user-1',
+        metadata: { email: normalizedEmail, ip: '127.0.0.1' },
+      });
+      expect(rateLimitService.recordLoginFailure).toHaveBeenCalledWith(
+        normalizedEmail,
+        '127.0.0.1',
+      );
+      expect(jwtService.sign).not.toHaveBeenCalled();
     });
   });
 });
