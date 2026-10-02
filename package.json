@@ -13,7 +13,7 @@
     "start": "nest start",
     "start:dev": "concurrently \"nest start --watch\" \"tsc-alias -p tsconfig.build.json -w\"",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/core/main",
     "lint": "oxlint src/ test/",
     "test": "vitest run",
     "test:watch": "vitest",

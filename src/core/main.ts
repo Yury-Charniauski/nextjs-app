@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter.js';
+import { PrismaExceptionFilter } from '../common/filters/prisma-exception.filter.js';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import cookieParser from 'cookie-parser';

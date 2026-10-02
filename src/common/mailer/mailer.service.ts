@@ -16,4 +16,13 @@ export class MailerService {
       text: `Use this OTP code for registration ${code}`,
     });
   }
+
+  async sendLoginOtp(email: string, code: string) {
+    await this.transport.sendMail({
+      from: process.env.SMTP_FROM,
+      to: email,
+      subject: 'OTP code for login verification',
+      text: `Use this OTP code for login ${code}`,
+    });
+  }
 }

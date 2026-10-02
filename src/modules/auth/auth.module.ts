@@ -1,6 +1,7 @@
 import { AuditModule } from "@/common/audit/audit.module.js";
 import { AuthController } from '@/modules/auth/auth.controller.js';
 import { AuthService } from '@/modules/auth/services/auth.service.js';
+import { LoginAttemptService } from "@/modules/auth/services/login-attempt.service.js";
 import { OtpService } from '@/modules/auth/services/otp.service.js';
 import { JwtStrategy } from '@/modules/auth/strategies/jwt.strategy.js';
 import { UserModule } from '@/modules/users/user.module.js';
@@ -17,10 +18,10 @@ const passportModule = PassportModule.register({ defaultStrategy: 'jwt' });
       signOptions: { expiresIn: '15m' },
     }),
     passportModule,
-    AuditModule
+    AuditModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, OtpService, JwtStrategy],
+  providers: [AuthService, OtpService, JwtStrategy, LoginAttemptService],
   exports: [passportModule, OtpService],
 })
 export class AuthModule {}

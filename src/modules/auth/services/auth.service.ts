@@ -3,9 +3,11 @@ import { MailerService } from '@/common/mailer/mailer.service.js';
 import { RateLimitService } from '@/common/rate-limit/rate-limit.service.js';
 import { UserStatus } from '@/generated/prisma/enums.js';
 import { ConfirmEmailDto } from '@/modules/auth/dto/confirm-email.dto.js';
+import { ConfirmLoginOtpDto } from '@/modules/auth/dto/confirm-login-otp.dto.js';
 import { LoginDto } from '@/modules/auth/dto/login.dto.js';
 import { RegisterDto } from '@/modules/auth/dto/register.dto.js';
 import { ResendOtpDto } from '@/modules/auth/dto/resend-otp.dto.js';
+import { LoginAttemptService } from '@/modules/auth/services/login-attempt.service.js';
 import { OtpService } from '@/modules/auth/services/otp.service.js';
 import { TJwtServicePayload } from '@/modules/auth/types/jwt-service.js';
 import { UserService } from '@/modules/users/user.service.js';
@@ -37,6 +39,7 @@ export class AuthService {
     private readonly rateLimitService: RateLimitService,
     private readonly jwtService: JwtService,
     private readonly auditService: AuditService,
+    private readonly loginAttemptService: LoginAttemptService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{
@@ -47,14 +50,7 @@ export class AuthService {
   }> {
     const email = dto.email.toLowerCase();
 
-    try {
-      await this.rateLimitService.consume(`ratelimit:register:${email}`, 60);
-    } catch (e) {
-      if (e instanceof HttpException && e.getStatus() === 429) {
-        this.logger.warn(`Register rate limited: ${email}`);
-      }
-      throw e;
-    }
+    await this.rateLimitService.consume(`ratelimit:register:${email}`);
 
     const existedEmail = await this.userService.findByEmail(email);
     if (existedEmail) {
@@ -145,7 +141,7 @@ export class AuthService {
     return { message: 'Verification code send.' };
   }
 
-  async login(dto: LoginDto, ip?: string) {
+  async login(dto: LoginDto, ip?: string, userAgent?: string) {
     const email = dto.email.toLowerCase();
     const existUser = await this.userService.findByEmail(email);
 
@@ -192,6 +188,41 @@ export class AuthService {
       throw new ForbiddenException('Account is disabled');
     }
 
+    const settings = await this.prisma.systemSetting.findFirst();
+    if (!settings) {
+      throw new InternalServerErrorException(
+        'System settings are not configured',
+      );
+    }
+
+    if (settings?.requireEmailConfirmationLogin) {
+      await this.rateLimitService.consume(
+        `ratelimit:otp:login:${existUser.id}`,
+      );
+
+      const { code, loginAttemptId } =
+        await this.loginAttemptService.createLoginAttempt({
+          userId: existUser.id,
+          ip,
+          userAgent,
+        });
+
+      await this.mailerService.sendLoginOtp(email, code);
+      await this.auditService.authLog({
+        action: 'LOGIN_2FA_DISPATCHED',
+        actorId: existUser.id,
+        entityId: existUser.id,
+        metadata: { email },
+      });
+
+      await this.rateLimitService.clearLoginFailure(email);
+
+      return {
+        requireConfirmation: settings?.requireEmailConfirmationLogin,
+        loginAttemptId,
+      };
+    }
+
     const accessToken = this.jwtService.sign({
       sub: existUser.id,
       type: 'access',
@@ -204,7 +235,6 @@ export class AuthService {
       },
     );
 
-    this.logger.log('Login success');
     await this.auditService.authLog({
       action: 'LOGIN_SUCCESS',
       actorId: existUser.id,
@@ -212,7 +242,11 @@ export class AuthService {
       metadata: { email },
     });
     await this.rateLimitService.clearLoginFailure(email);
-    return { accessToken, refreshToken };
+    return {
+      requireConfirmation: settings?.requireEmailConfirmationLogin,
+      accessToken,
+      refreshToken,
+    };
   }
 
   async refresh(token: string) {
@@ -252,5 +286,79 @@ export class AuthService {
     );
 
     return { accessToken, refreshToken };
+  }
+
+  async confirmLoginOtp(
+    { code, loginAttemptId }: ConfirmLoginOtpDto,
+    ip?: string,
+    userAgent?: string,
+  ) {
+    const userId = await this.loginAttemptService.confirmLoginOpt(
+      loginAttemptId,
+      code,
+      ip,
+      userAgent,
+    );
+
+    const existUser = await this.userService.findOne(userId);
+
+    if (!existUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (existUser.status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException('Access is forbidden');
+    }
+
+    const accessToken = this.jwtService.sign({
+      sub: existUser.id,
+      type: 'access',
+    });
+    const refreshToken = this.jwtService.sign(
+      { sub: existUser.id, type: 'refresh' },
+      {
+        secret: process.env.JWT_REFRESH_SECRET,
+        expiresIn: '30d',
+      },
+    );
+
+    await this.auditService.authLog({
+      action: 'LOGIN_SUCCESS',
+      actorId: existUser.id,
+      entityId: existUser.id,
+      metadata: { email: existUser.email },
+    });
+
+    await this.rateLimitService.clearLoginFailure(existUser.email);
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  async resendLoginOtp(loginAttemptId: string) {
+    const data =
+      await this.loginAttemptService.replaceLoginCode(loginAttemptId);
+
+    if (!data) {
+      throw new BadRequestException('Login session expired or invalid');
+    }
+
+    const existUser = await this.userService.findOne(data.userId);
+
+    if (!existUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    await this.mailerService.sendLoginOtp(existUser.email, data.code);
+
+    await this.auditService.authLog({
+      action: 'LOGIN_2FA_DISPATCHED',
+      actorId: existUser.id,
+      entityId: existUser.id,
+      metadata: { email: existUser.email },
+    });
+
+    return { ok: true };
   }
 }

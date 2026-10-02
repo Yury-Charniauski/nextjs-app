@@ -19,9 +19,7 @@
     "strictPropertyInitialization": false,
     "types": ["vitest/globals", "node"],
     "paths": {
-      "@/*": ["./src/*"],
-      "@common": ["./src/common/*"],
-      "@modules": ["./src/modules/*"],
+      "@/*": ["./src/*"]
     }
   },
   "ts-node": {

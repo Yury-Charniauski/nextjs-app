@@ -1,4 +1,5 @@
 import { REDIS_CLIENT } from '@/common/redis/redis.module.js';
+import { generateOtpCode } from '@/modules/auth/utility/generate-otp-code.js';
 import {
   BadRequestException,
   HttpException,
@@ -22,10 +23,6 @@ export class OtpService {
 
   constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
 
-  private generateCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
-
   async createOtp(
     userId: string,
     purpose: 'registration' | 'email-change',
@@ -41,7 +38,7 @@ export class OtpService {
       );
     }
 
-    const code = this.generateCode();
+    const code = generateOtpCode();
     const otpKey = `otp:${purpose}:${userId}`;
     const data: OtpData = { code, attempts: 0, ...(newEmail && { newEmail }) };
 
