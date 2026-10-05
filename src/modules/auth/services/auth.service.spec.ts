@@ -1,9 +1,15 @@
+import 'dotenv/config';
 import { AuditService } from '@/common/audit/audit.service.js';
 import { MailerService } from '@/common/mailer/mailer.service.js';
 import { RateLimitService } from '@/common/rate-limit/rate-limit.service.js';
+import {
+  jwtConfig,
+  refreshSignOptions,
+} from '@/modules/auth/config/jwt.config.js';
 import { ConfirmEmailDto } from '@/modules/auth/dto/confirm-email.dto.js';
 import { LoginDto } from '@/modules/auth/dto/login.dto.js';
 import { RegisterDto } from '@/modules/auth/dto/register.dto.js';
+import { LoginAttemptService } from '@/modules/auth/services/login-attempt.service.js';
 import { OtpService } from '@/modules/auth/services/otp.service.js';
 import { UserService } from '@/modules/users/user.service.js';
 import { PrismaService } from '@/prisma/prisma.service.js';
@@ -65,6 +71,12 @@ describe('AuthService', () => {
     log: vi.fn(),
   };
 
+  const loginAttemptService = {
+    createLoginAttempt: vi.fn(),
+    confirmLoginOpt: vi.fn(),
+    replaceLoginCode: vi.fn(),
+  };
+
   const registerDto: RegisterDto = {
     email: 'user@test.com',
     password: 'Password1',
@@ -86,6 +98,7 @@ describe('AuthService', () => {
         { provide: RateLimitService, useValue: rateLimitService },
         { provide: JwtService, useValue: jwtService },
         { provide: AuditService, useValue: auditService },
+        { provide: LoginAttemptService, useValue: loginAttemptService },
       ],
     }).compile();
 
@@ -338,6 +351,9 @@ describe('AuthService', () => {
 
     it('returns tokens and writes LOGIN_SUCCESS for an active user', async () => {
       userService.findByEmail.mockResolvedValue(activeUser());
+      prisma.systemSetting.findFirst.mockResolvedValue({
+        requireEmailConfirmationLogin: false,
+      });
       jwtService.sign.mockImplementation(
         (payload: { type: string }) => `${payload.type}-token`,
       );
@@ -345,20 +361,23 @@ describe('AuthService', () => {
       const result = await authService.login(loginDto);
 
       expect(result).toEqual({
+        requireConfirmation: false,
         accessToken: 'access-token',
         refreshToken: 'refresh-token',
       });
-      expect(jwtService.sign).toHaveBeenNthCalledWith(1, {
-        sub: 'user-1',
-        type: 'access',
-      });
+      expect(jwtService.sign).toHaveBeenNthCalledWith(
+        1,
+        { sub: 'user-1', type: 'access' },
+        {
+          expiresIn: jwtConfig.access.expiresIn,
+          issuer: jwtConfig.issuer,
+          audience: jwtConfig.audience,
+        },
+      );
       expect(jwtService.sign).toHaveBeenNthCalledWith(
         2,
         { sub: 'user-1', type: 'refresh' },
-        {
-          secret: process.env.JWT_REFRESH_SECRET,
-          expiresIn: '30d',
-        },
+        refreshSignOptions,
       );
       expect(auditService.authLog).toHaveBeenCalledWith({
         action: 'LOGIN_SUCCESS',

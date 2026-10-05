@@ -2,6 +2,10 @@ import { AuditService } from '@/common/audit/audit.service.js';
 import { MailerService } from '@/common/mailer/mailer.service.js';
 import { RateLimitService } from '@/common/rate-limit/rate-limit.service.js';
 import { UserStatus } from '@/generated/prisma/enums.js';
+import {
+  jwtConfig,
+  refreshSignOptions,
+} from '@/modules/auth/config/jwt.config.js';
 import { ConfirmEmailDto } from '@/modules/auth/dto/confirm-email.dto.js';
 import { ConfirmLoginOtpDto } from '@/modules/auth/dto/confirm-login-otp.dto.js';
 import { LoginDto } from '@/modules/auth/dto/login.dto.js';
@@ -223,16 +227,20 @@ export class AuthService {
       };
     }
 
-    const accessToken = this.jwtService.sign({
-      sub: existUser.id,
-      type: 'access',
-    });
+    const accessToken = this.jwtService.sign(
+      {
+        sub: existUser.id,
+        type: 'access',
+      },
+      {
+        expiresIn: jwtConfig.access.expiresIn,
+        issuer: jwtConfig.issuer,
+        audience: jwtConfig.audience,
+      },
+    );
     const refreshToken = this.jwtService.sign(
       { sub: existUser.id, type: 'refresh' },
-      {
-        secret: process.env.JWT_REFRESH_SECRET,
-        expiresIn: '30d',
-      },
+      refreshSignOptions,
     );
 
     await this.auditService.authLog({
@@ -253,9 +261,28 @@ export class AuthService {
     let payload: null | TJwtServicePayload = null;
     try {
       payload = this.jwtService.verify<TJwtServicePayload>(token, {
-        secret: process.env.JWT_REFRESH_SECRET,
+        secret: jwtConfig.refresh.secret,
+        issuer: jwtConfig.issuer,
+        audience: jwtConfig.audience,
       });
-    } catch {
+    } catch (err) {
+      const name = err instanceof Error ? err.name : '';
+      if (name === 'TokenExpiredError') {
+        await this.auditService.authLog({
+          action: 'AUTH_DENIED',
+          actorId: null,
+          metadata: { reason: 'JWT_EXPIRED' },
+        });
+      }
+
+      if (name === 'JsonWebTokenError') {
+        await this.auditService.authLog({
+          action: 'AUTH_DENIED',
+          actorId: null,
+          metadata: { reason: 'INVALID_SIGNATURE' },
+        });
+      }
+
       throw new UnauthorizedException('Unauthorized user');
     }
 
@@ -264,25 +291,59 @@ export class AuthService {
       payload.type !== 'refresh' ||
       typeof payload.sub !== 'string'
     ) {
+      await this.auditService.authLog({
+        action: 'AUTH_DENIED',
+        actorId: null,
+        metadata: { reason: 'INVALID_SIGNATURE' },
+      });
       throw new UnauthorizedException('Unauthorized user');
     }
 
     const user = await this.userService.findOne(payload.sub);
 
-    if (!user || user.status !== UserStatus.ACTIVE) {
+    if (!user) {
+      await this.auditService.authLog({
+        action: 'AUTH_DENIED',
+        actorId: null,
+        metadata: { reason: 'USER_NOT_FOUND' },
+      });
       throw new ForbiddenException('Access is forbidden');
     }
 
-    const accessToken = this.jwtService.sign({
-      sub: user.id,
-      type: 'access',
-    });
+    if (user.status === UserStatus.BLOCKED) {
+      await this.auditService.authLog({
+        action: 'AUTH_DENIED',
+        actorId: user.id,
+        entityId: user.id,
+        metadata: { reason: 'USER_BLOCKED' },
+      });
+      throw new ForbiddenException('Access is forbidden');
+    }
+
+    if (user.status === UserStatus.PENDING) {
+      await this.auditService.authLog({
+        action: 'AUTH_DENIED',
+        actorId: user.id,
+        entityId: user.id,
+        metadata: { reason: 'USER_PENDING' },
+      });
+      throw new ForbiddenException('Access is forbidden');
+    }
+
+    const accessToken = this.jwtService.sign(
+      {
+        sub: user.id,
+        type: 'access',
+      },
+      {
+        expiresIn: jwtConfig.access.expiresIn,
+        issuer: jwtConfig.issuer,
+        audience: jwtConfig.audience,
+      },
+    );
     const refreshToken = this.jwtService.sign(
       { sub: user.id, type: 'refresh' },
-      {
-        secret: process.env.JWT_REFRESH_SECRET,
-        expiresIn: '30d',
-      },
+      refreshSignOptions,
     );
 
     return { accessToken, refreshToken };
@@ -310,16 +371,20 @@ export class AuthService {
       throw new ForbiddenException('Access is forbidden');
     }
 
-    const accessToken = this.jwtService.sign({
-      sub: existUser.id,
-      type: 'access',
-    });
+    const accessToken = this.jwtService.sign(
+      {
+        sub: existUser.id,
+        type: 'access',
+      },
+      {
+        expiresIn: jwtConfig.access.expiresIn,
+        issuer: jwtConfig.issuer,
+        audience: jwtConfig.audience,
+      },
+    );
     const refreshToken = this.jwtService.sign(
       { sub: existUser.id, type: 'refresh' },
-      {
-        secret: process.env.JWT_REFRESH_SECRET,
-        expiresIn: '30d',
-      },
+      refreshSignOptions,
     );
 
     await this.auditService.authLog({

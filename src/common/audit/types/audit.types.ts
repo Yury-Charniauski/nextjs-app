@@ -10,7 +10,8 @@ export type AuthAuditAction =
   | 'LOGIN_FAILED'
   | 'LOGIN_2FA_DISPATCHED'
   | 'LOGIN_2FA_FAILED'
-  | 'LOGIN_LOCKOUT';
+  | 'LOGIN_LOCKOUT'
+  | 'AUTH_DENIED'
 
 export type AdminAuditEntry = {
   action: CrudAction;

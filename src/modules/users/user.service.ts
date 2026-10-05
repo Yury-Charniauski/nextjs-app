@@ -87,7 +87,7 @@ export class UserService {
   async updateName(dto: UpdateProfileDto, user: TAuth) {
     return await this.prisma.$transaction(async (tx) => {
       const updated = await tx.user.update({
-        where: { id: user.userId },
+        where: { id: user.id },
         data: {
           name: dto.name,
         },
@@ -115,7 +115,7 @@ export class UserService {
   async updatePassword(dto: UpdatePasswordDto, user: TAuth) {
     return await this.prisma.$transaction(async (tx) => {
       const existUser = await tx.user.findUnique({
-        where: { id: user.userId },
+        where: { id: user.id },
       });
 
       if (!existUser) throw new NotFoundException('User not found');
@@ -131,7 +131,7 @@ export class UserService {
       const newPassword = await bcrypt.hash(dto.newPassword, 10);
 
       await tx.user.update({
-        where: { id: user.userId },
+        where: { id: user.id },
         data: {
           password: newPassword,
         },
@@ -153,7 +153,7 @@ export class UserService {
   async updateEmail(dto: UpdateEmailDto, user: TAuth) {
     const email = dto.email.toLowerCase();
     const activeUser = await this.prisma.user.findUnique({
-      where: { id: user.userId },
+      where: { id: user.id },
     });
 
     if (!activeUser) throw new NotFoundException('User not found');
@@ -169,7 +169,7 @@ export class UserService {
       throw new BadRequestException('Password is incorrect');
 
     const code = await this.otpService.createOtp(
-      user.userId,
+      user.id,
       'email-change',
       email,
     );

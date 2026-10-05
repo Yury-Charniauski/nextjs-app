@@ -33,7 +33,7 @@ export class UserController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getProfile(@CurrentUser() user: TAuth) {
-    return await this.userService.findOne(user.userId);
+    return await this.userService.findOne(user.id);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -64,6 +64,6 @@ export class UserController {
     @Body() dto: ConfirmEmailChangeDto,
     @CurrentUser() user: TAuth,
   ) {
-    return this.userService.confirmUpdateEmail(dto.code, user.userId);
+    return this.userService.confirmUpdateEmail(dto.code, user.id);
   }
 }

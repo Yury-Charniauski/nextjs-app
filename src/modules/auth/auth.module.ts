@@ -1,7 +1,8 @@
-import { AuditModule } from "@/common/audit/audit.module.js";
+import { AuditModule } from '@/common/audit/audit.module.js';
 import { AuthController } from '@/modules/auth/auth.controller.js';
+import { jwtConfig } from '@/modules/auth/config/jwt.config.js';
 import { AuthService } from '@/modules/auth/services/auth.service.js';
-import { LoginAttemptService } from "@/modules/auth/services/login-attempt.service.js";
+import { LoginAttemptService } from '@/modules/auth/services/login-attempt.service.js';
 import { OtpService } from '@/modules/auth/services/otp.service.js';
 import { JwtStrategy } from '@/modules/auth/strategies/jwt.strategy.js';
 import { UserModule } from '@/modules/users/user.module.js';
@@ -14,8 +15,12 @@ const passportModule = PassportModule.register({ defaultStrategy: 'jwt' });
   imports: [
     forwardRef(() => UserModule),
     JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET,
-      signOptions: { expiresIn: '15m' },
+      secret: jwtConfig.access.secret,
+      signOptions: {
+        expiresIn: jwtConfig.access.expiresIn,
+        issuer: jwtConfig.issuer,
+        audience: jwtConfig.audience,
+      },
     }),
     passportModule,
     AuditModule,
