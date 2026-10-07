@@ -1,4 +1,9 @@
 import { REDIS_CLIENT } from '@/common/redis/redis.module.js';
+import {
+  OtpPayload,
+  TOtpData,
+  VerifyPurpose,
+} from '@/modules/auth/types/otp-service.types.js';
 import { generateOtpCode } from '@/modules/auth/utility/generate-otp-code.js';
 import {
   BadRequestException,
@@ -8,12 +13,6 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Redis } from 'ioredis';
-
-interface OtpData {
-  code: string;
-  attempts: number;
-  newEmail?: string;
-}
 
 @Injectable()
 export class OtpService {
@@ -25,8 +24,8 @@ export class OtpService {
 
   async createOtp(
     userId: string,
-    purpose: 'registration' | 'email-change',
-    newEmail?: string,
+    purpose: VerifyPurpose,
+    payload?: OtpPayload,
   ): Promise<string> {
     const rateLimitKey = `ratelimit:otp:${purpose}:${userId}`;
     const isRateLimited = await this.redis.get(rateLimitKey);
@@ -40,7 +39,11 @@ export class OtpService {
 
     const code = generateOtpCode();
     const otpKey = `otp:${purpose}:${userId}`;
-    const data: OtpData = { code, attempts: 0, ...(newEmail && { newEmail }) };
+    const data: TOtpData = {
+      code,
+      attempts: 0,
+      ...(payload && { payload }),
+    };
 
     await this.redis.set(otpKey, JSON.stringify(data), 'EX', this.OTP_TTL);
     await this.redis.set(rateLimitKey, '1', 'EX', this.RESEND_TTL);
@@ -48,11 +51,11 @@ export class OtpService {
     return code;
   }
 
-  async verifyOtp<T extends string | boolean>(
+  async verifyOtp(
     userId: string,
     inputCode: string,
-    purpose: 'registration' | 'email-change',
-  ): Promise<T> {
+    purpose: VerifyPurpose,
+  ): Promise<OtpPayload> {
     const otpKey = `otp:${purpose}:${userId}`;
     const rawData = await this.redis.get(otpKey);
 
@@ -62,7 +65,7 @@ export class OtpService {
       );
     }
 
-    const data: OtpData = JSON.parse(rawData);
+    const data: TOtpData = JSON.parse(rawData);
 
     if (data.attempts >= this.MAX_ATTEMPTS) {
       await this.redis.del(otpKey);
@@ -81,17 +84,7 @@ export class OtpService {
       throw new BadRequestException('Verification code is does not correct');
     }
 
-    if (purpose === 'email-change') {
-      if (!data.newEmail) {
-        throw new BadRequestException(
-          'Verification code expires or does not exist',
-        );
-      }
-      await this.redis.del(otpKey);
-      return data.newEmail as T;
-    }
-
     await this.redis.del(otpKey);
-    return true as T;
+    return { newEmail: data.payload?.newEmail, reason: data.payload?.reason };
   }
 }

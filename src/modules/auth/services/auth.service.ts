@@ -159,6 +159,10 @@ export class AuthService {
       throw new HttpException('LOGIN_LOCKOUT', HttpStatus.TOO_MANY_REQUESTS);
     }
 
+    if (!existUser) {
+      throw new NotFoundException('User not found')
+    }
+
     if (
       !existUser ||
       !(await bcrypt.compare(dto.password, existUser.password))

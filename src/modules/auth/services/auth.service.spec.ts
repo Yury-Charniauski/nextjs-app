@@ -202,7 +202,7 @@ describe('AuthService', () => {
         email: 'user@test.com',
         status: UserStatus.PENDING,
       });
-      otpService.verifyOtp.mockResolvedValue(true);
+      otpService.verifyOtp.mockResolvedValue({});
       userService.updateStatus.mockResolvedValue({
         id: 'user-1',
         email: 'user@test.com',

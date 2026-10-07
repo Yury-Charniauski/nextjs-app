@@ -4,20 +4,26 @@ import type { TAuth } from '@/modules/auth/types/auth.types.js';
 import { RequirePermission } from '@/modules/rbac/decorators/require-permission.js';
 import { PermissionGuard } from '@/modules/rbac/guards/permissions.guard.js';
 import { ConfirmEmailChangeDto } from '@/modules/users/dto/confirm-email-change.dto.js';
+import { RemoveUserConfirm } from '@/modules/users/dto/remove-user-confirm.dto.js';
+import { RemoveUserDto } from '@/modules/users/dto/remove-user.dto.js';
 import { UpdateEmailDto } from '@/modules/users/dto/update-email.dto.js';
 import { UpdatePasswordDto } from '@/modules/users/dto/update-password.dto.js';
 import { UpdateProfileDto } from '@/modules/users/dto/update-profile.dto.js';
+import { UserService } from '@/modules/users/user.service.js';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Param,
   Patch,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
-import { UserService } from './user.service.js';
+import type { Response } from 'express';
 
 @Controller('users')
 export class UserController {
@@ -28,6 +34,17 @@ export class UserController {
   @Get()
   findAll() {
     return this.userService.findAll();
+  }
+
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission('users', 'delete')
+  @Delete(':id')
+  async removeUser(
+    @Param('id') removeUserId: string,
+    @Body() dto: RemoveUserDto,
+    @CurrentUser() user: TAuth,
+  ) {
+    return this.userService.removeUser(removeUserId, user.id, dto.reason);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -65,5 +82,31 @@ export class UserController {
     @CurrentUser() user: TAuth,
   ) {
     return this.userService.confirmUpdateEmail(dto.code, user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('me/delete')
+  async remove(@Body() dto: RemoveUserDto, @CurrentUser() user: TAuth) {
+    return this.userService.selfRemoveUser(user, dto.reason);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('me/delete/confirm')
+  @HttpCode(HttpStatus.OK)
+  async removeConfirmation(
+    @Body() dto: RemoveUserConfirm,
+    @Res({ passthrough: true }) res: Response,
+    @CurrentUser() user: TAuth,
+  ) {
+    const message = await this.userService.selfRemoveUserConfirm(
+      user.id,
+      dto.code,
+    );
+
+    res.clearCookie('access_token', { path: '/' });
+    res.clearCookie('refresh_token', { path: '/auth/refresh' });
+
+    return message;
   }
 }
